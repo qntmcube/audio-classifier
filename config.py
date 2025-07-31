@@ -1,0 +1,6 @@
+SAMPLE_RATE = 16000
+CLIP_SECONDS = 1.0
+INFERENCE_STRIDE_SECONDS = 0.5
+DEVICE_ID = None    # Use None for default device, or specify the device ID
+
+SAMPLE_LENGTH = int(CLIP_SECONDS * SAMPLE_RATE)

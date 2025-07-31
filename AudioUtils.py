@@ -8,14 +8,16 @@ import config
 class AudioUtil():
     @staticmethod
     def open(filename):
-        signal, sr = torchaudio.load(filename)
-        return(signal, sr)
+        signal = torch.load(filename)
+        return(signal)
     
     @staticmethod
     def rechannel(audio):
         signal, sr = audio
         if (signal.shape[0] == 2):
             audio = (signal[:1], sr)
+        elif (len(signal.shape) == 1):
+            audio = (signal.unsqueeze(0), sr)
         return audio
         
     @staticmethod
@@ -67,6 +69,8 @@ def load_data(root):
     # Find all class folders and map them to integer labels
     classes = sorted(entry.name for entry in os.scandir(root) if entry.is_dir())
     class_to_idx = {cls_name: i for i, cls_name in enumerate(classes)}
+    global idx_to_class
+    idx_to_class = {v: k for k, v in class_to_idx.items()}
     
     samples = []
     # Find all audio files and their corresponding class index
@@ -74,10 +78,14 @@ def load_data(root):
         class_idx = class_to_idx[class_name]
         class_dir = os.path.join(root, class_name)
         for filename in os.listdir(class_dir):
-            if filename.lower().endswith(('.wav', '.mp3', '.flac')):
+            if filename.lower().endswith('.pt'):
                 path = os.path.join(class_dir, filename)
                 audio = AudioUtil.open(path)
-                data = AudioUtil.preprocess(audio)
+                print(audio)
+                print(audio.shape)
+                data = AudioUtil.preprocess((audio, config.SAMPLE_RATE))
+                print(data)
+                print(data.shape)
                 samples.append((data, class_idx))
 
     data, class_idx = zip(*samples)

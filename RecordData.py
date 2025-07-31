@@ -9,25 +9,23 @@ import sounddevice as sd
 from collections import deque
 import time
 import threading
+import os
 
-# load and organize data
-feat, label = au.load_data("data/")
-feat_train, feat_test, label_train, label_test = train_test_split(
-    feat, label, test_size=0.2, random_state=42, stratify=label
-)
+class_name = input("Title the audio class you are trying to record:\n")
+file_counter = 0
 
-# scale data for SVM
-scaler = StandardScaler()
-feat_train_scaled = scaler.fit_transform(feat_train)
-feat_test_scaled = scaler.transform(feat_test)
+new_directory = os.path.join("data", class_name)
 
-# train model
-myModel = SVC(kernel='rbf', C=10, gamma='scale', probability=True)
-myModel.fit(feat_train_scaled, label_train)
+try:
+    os.makedirs(new_directory, exist_ok=True)
+    print(f"Directory '{new_directory}' created or already exists.")
+except OSError as e:
+    print(f"Error creating directory: {e}")
 
-# evaluate model
-predictions = myModel.predict(feat_test_scaled)
-print(classification_report(label_test, predictions))
+for item in os.listdir(new_directory):
+    item_path = os.path.join(new_directory, item)
+    if os.path.isfile(item_path):
+        file_counter += 1
 
 print("Available audio devices:")
 print(sd.query_devices())
@@ -48,7 +46,7 @@ def audio_callback(indata, frames, time, status):
 
 # Main Inference Loop 
 try:
-    print("\nStarting live inference... Press Ctrl+C to stop.")
+    print("\nStarting data collection... Press Ctrl+C to stop.")
     # Create and start the microphone stream
     stream = sd.InputStream(
         device=config.DEVICE_ID,
@@ -67,21 +65,14 @@ try:
         with buffer_lock:
             if len(audio_buffer) == config.SAMPLE_LENGTH:
                 clip = torch.tensor(list(audio_buffer))
+                audio_buffer.clear()
 
         # process the data separately so the stream doesn't wait
         if clip is not None:
-            # Process the clip
-            data = au.AudioUtil.MFCC((clip, config.SAMPLE_RATE))
-            flat_data = torch.flatten(data)
-            scaled_data = scaler.transform(flat_data.unsqueeze(0))
-            
-            output = myModel.predict(scaled_data)
-            
-            # Print the prediction
-            print(au.idx_to_class[output])
-            
-            # Wait for the stride duration before processing the next clip
-            time.sleep(config.INFERENCE_STRIDE_SECONDS)
+            file_path = os.path.join(new_directory, f"{class_name}_example_{file_counter}.pt")
+            torch.save(clip, file_path)
+            print(f"saved clip: {file_path}")
+            file_counter += 1
         else:
             # Wait for more audio data to fill the buffer
             print(f"Buffering... {len(audio_buffer)}/{config.SAMPLE_LENGTH}", end='\r')
@@ -89,10 +80,15 @@ try:
 
 except KeyboardInterrupt:
     print("\nStopping inference.")    
+except Exception as e:
+    print(f"An error occurred: {e}")
 
 finally:
     print("stopping")
     shutdown_event.set()
-    stream.stop()
-    stream.close()
+    print("more stopping")
+    if stream:
+        print("more more stopping")
+        stream.stop()
+        stream.close()
     print("stopped")
